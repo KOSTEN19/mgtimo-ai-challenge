@@ -1,0 +1,32 @@
+# Локальный / простой запуск приложения БЕЗ edge.
+# Порт только на loopback — снаружи VPS так не выставлять.
+# Прод с nginx + TLS + логами для fail2ban:
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+
+services:
+  web:
+    build: .
+    image: mgtimo-cabinet:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    environment:
+      SESSION_SECRET: ${SESSION_SECRET:?Задайте SESSION_SECRET в файле .env}
+      DATABASE_URL: file:/data/mgtimo.db
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - mgtimo-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mgtimo-data:

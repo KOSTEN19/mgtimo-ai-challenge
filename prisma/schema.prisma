@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Все данные вымышленные. Роль: STUDENT или STAFF.
+model User {
+  id           String   @id @default(cuid())
+  login        String   @unique
+  passwordHash String
+  role         String
+  fullName     String
+  createdAt    DateTime @default(now())
+
+  student       Student?
+  requests      Request[]
+  notifications Notification[]
+  events        RequestEvent[]
+}
+
+model Student {
+  userId     String @id
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  faculty    String
+  direction  String
+  course     Int
+  groupName  String
+  caseNumber String
+  dorm       String
+  military   String
+  language   String
+
+  grades      Grade[]
+  clearance   ClearanceItem[]
+  attendance  AttendanceRecord[]
+}
+
+// present | absent | late | excused
+model AttendanceRecord {
+  id        String  @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  date      String
+  subject   String
+  status    String
+
+  @@index([studentId, date])
+}
+
+// Расписание группы. week: BOTH | NUM | DEN. weekday: 1 (пн) .. 6 (сб).
+model Lesson {
+  id        String @id @default(cuid())
+  groupName String
+  weekday   Int
+  week      String
+  startTime String
+  endTime   String
+  subject   String
+  kind      String
+  room      String
+  teacher   String
+  material  String?
+
+  changes LessonChange[]
+
+  @@index([groupName, weekday])
+}
+
+// Перенос или отмена конкретной пары на конкретную дату (YYYY-MM-DD).
+model LessonChange {
+  id        String  @id @default(cuid())
+  lessonId  String
+  lesson    Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  date      String
+  cancelled Boolean @default(false)
+  newStart  String?
+  newEnd    String?
+  newRoom   String?
+  reason    String
+
+  @@unique([lessonId, date])
+}
+
+// score: "5" | "4" | "3" | "2" | "Зачтено" | "Не зачтено" | null (ещё нет)
+model Grade {
+  id        String    @id @default(cuid())
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  semester  Int
+  subject   String
+  control   String
+  hours     Int
+  score     String?
+  examDate  String?
+  atRisk    Boolean   @default(false)
+  note      String?
+
+  @@index([studentId, semester])
+}
+
+model Request {
+  id        String         @id @default(cuid())
+  number    String         @unique
+  studentId String
+  student   User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  type      String
+  format    String
+  comment   String
+  status    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now())
+  events    RequestEvent[]
+
+  @@index([studentId])
+  @@index([status])
+}
+
+model RequestEvent {
+  id        String   @id @default(cuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  status    String
+  comment   String?
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// kind: STATUS | REMINDER. Принадлежит одному пользователю.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String
+  requestId String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+// Новости деканата. faculty = null значит для всех.
+model News {
+  id          String   @id @default(cuid())
+  faculty     String?
+  title       String
+  body        String
+  publishedAt DateTime
+}
+
+// status: DONE | WAITING | TODO
+model ClearanceItem {
+  id        String  @id @default(cuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  unit      String
+  status    String
+  note      String?
+  position  Int
+
+  @@index([studentId])
+}

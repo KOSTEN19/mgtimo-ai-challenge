@@ -1,0 +1,44 @@
+# Разработка в Docker с монтированием кода (без npm install внутри Dockerfile):
+#   docker compose -f docker-compose.dev.yml up
+services:
+  web:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      SESSION_SECRET: ${SESSION_SECRET:?Задайте SESSION_SECRET в файле .env}
+      DATABASE_URL: file:/data/mgtimo.db
+      WATCHPACK_POLLING: "true"
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      ALL_PROXY: ""
+      all_proxy: ""
+      NO_PROXY: "*"
+      no_proxy: "*"
+      npm_config_proxy: ""
+      npm_config_https_proxy: ""
+      npm_config_registry: "https://registry.npmjs.org/"
+    volumes:
+      - .:/app
+      - mgtimo-dev-modules:/app/node_modules
+      - mgtimo-dev-next:/app/.next
+      - mgtimo-dev-data:/data
+    command:
+      - sh
+      - -c
+      - |
+        apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates >/dev/null \
+        && if [ ! -d node_modules/next ]; then npm install --no-audit --no-fund; fi \
+        && npx prisma generate \
+        && npx prisma db push --skip-generate \
+        && npx tsx prisma/seed.ts \
+        && npx next dev -H 0.0.0.0
+
+volumes:
+  mgtimo-dev-modules:
+  mgtimo-dev-next:
+  mgtimo-dev-data:
